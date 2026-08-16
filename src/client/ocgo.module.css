@@ -1,0 +1,220 @@
+/* dsh-ocgo-usage composer dock chip styles.
+ *
+ * The chip floats above the composer input card: `.wrap` is positioned
+ * absolutely as the natural (pre-drag) resting place, then the drag/follow
+ * logic in OcgoDockEntry hands `position: fixed` coordinates over directly
+ * through inline styles, so no CSS here manages the floating position. */
+
+.wrap {
+  display: inline-flex;
+  position: absolute;
+  bottom: calc(100% - 1px);
+  left: -9px;
+  z-index: 50;
+  user-select: none;
+}
+
+.segOk {
+  color: var(--dsh-color-success, #3fb950);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dsh-color-surface, transparent);
+  color: var(--dsh-color-text, inherit);
+  font-size: 12px;
+  line-height: 1;
+  cursor: grab;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.chip:hover,
+.chipOpen {
+  border-color: var(--dsh-color-accent, rgba(80, 160, 255, 0.7));
+}
+
+.lockBtn {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  border: 0;
+  background: 0 0;
+  color: var(--dsh-color-accent, rgba(80, 160, 255, 0.9));
+  font-size: 11px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.seg {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.segSep {
+  opacity: 0.45;
+}
+
+.segWarn {
+  color: var(--dsh-color-warning, #d29922);
+}
+
+.segErr {
+  color: var(--dsh-color-danger, #e5534b);
+}
+
+.details {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsh-color-border, rgba(128, 128, 128, 0.35));
+  border-radius: 8px;
+  background: var(--dsh-color-surface-elevated, #1f1f1f);
+  color: var(--dsh-color-text, inherit);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
+}
+
+.window {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.windowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsh-color-text-secondary, inherit);
+  opacity: 0.9;
+}
+
+.windowValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.windowReset {
+  opacity: 0.65;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--dsh-color-border, rgba(128, 128, 128, 0.25));
+  padding-top: 6px;
+  font-size: 11px;
+}
+
+/* The right cluster of the footer: `refresh upd HH:MM`, right-aligned. */
+.footRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.setBtn {
+  border: 0;
+  background: 0 0;
+  color: var(--dsh-color-accent, rgba(80, 160, 255, 0.9));
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-transform: lowercase;
+}
+
+.setBtn:hover {
+  text-decoration: underline;
+}
+
+.fetchedAt {
+  opacity: 0.6;
+}
+
+.refreshBtn {
+  border: 0;
+  background: 0 0;
+  color: var(--dsh-color-accent, rgba(80, 160, 255, 0.9));
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.refreshBtn:hover {
+  text-decoration: underline;
+}
+
+/* The Set editor panel. */
+.setPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 260px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fieldLabel {
+  color: var(--dsh-color-text-secondary, inherit);
+  opacity: 0.75;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fieldInput {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--dsh-color-border, rgba(128, 128, 128, 0.35));
+  background: var(--dsh-color-surface, transparent);
+  color: var(--dsh-color-text, inherit);
+  border-radius: 6px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.fieldInput:focus {
+  border-color: var(--dsh-color-accent, rgba(80, 160, 255, 0.7));
+}
+
+.setHint {
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.errorText {
+  color: var(--dsh-color-danger, #e5534b);
+  font-size: 11px;
+  max-width: 240px;
+  white-space: normal;
+}
