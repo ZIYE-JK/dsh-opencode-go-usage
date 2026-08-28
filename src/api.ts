@@ -150,6 +150,57 @@ export function fromSSRHTML(html: string): Omit<NormalizedUsage, 'updatedAt'> {
       status: item.percent >= 100 ? 'rate-limited' : 'ok',
     }
   }
+  // Current OpenCode SSR pages may serialize the usage objects as references
+  // (for example `rollingUsage:$R[34]` followed by
+  // `$R[34]={status:"ok",resetInSec:18000,usagePercent:7,...}`). When both
+  // formats coexist during hydration, the data-slot markup can be a stale
+  // shell (notably an old "Monthly 100%" value); use live serialized data.
+  const serialized = fromSerializedUsage(html)
+  return {
+    rolling: serialized.rolling ?? result.rolling,
+    weekly: serialized.weekly ?? result.weekly,
+    monthly: serialized.monthly ?? result.monthly,
+  }
+}
+
+/**
+ * Parse SolidStart's serialized reference payload used by current OpenCode
+ * usage pages.  This deliberately requires `usagePercent` so initialization
+ * placeholders such as `monthlyUsage:0` cannot be mistaken for real data.
+ */
+function fromSerializedUsage(html: string): {
+  rolling?: UsageWindow
+  weekly?: UsageWindow
+  monthly?: UsageWindow
+} {
+  const result: {
+    rolling?: UsageWindow
+    weekly?: UsageWindow
+    monthly?: UsageWindow
+  } = {}
+  const referenceRe = /\b(rolling|weekly|monthly)Usage\s*:\s*\$R\[(\d+)\]/g
+  let ref = referenceRe.exec(html)
+  while (ref !== null) {
+    const kind = ref[1] as UsageWindowKind
+    const id = ref[2]
+    // Values in this object are primitive fields; stop at its closing brace to
+    // avoid accidentally pairing a reference with a later serialized object.
+    const objectRe = new RegExp(`\\$R\\[${id}\\]\\s*=\\s*\\{([\\s\\S]*?)\\}`)
+    const object = objectRe.exec(html)?.[1]
+    const percentMatch = object?.match(/\busagePercent\s*:\s*(\d+(?:\.\d+)?)/)
+    if (object && percentMatch) {
+      const resetMatch = object.match(/\bresetInSec\s*:\s*(\d+)/)
+      const statusMatch = object.match(/\bstatus\s*:\s*["']([^"']+)["']/)
+      const percent = Number.parseFloat(percentMatch[1] ?? '0')
+      result[kind] = {
+        kind,
+        percent: clampPercent(percent),
+        resetInSec: Number.parseInt(resetMatch?.[1] ?? '0', 10),
+        status: statusMatch?.[1] === 'rate-limited' || percent >= 100 ? 'rate-limited' : 'ok',
+      }
+    }
+    ref = referenceRe.exec(html)
+  }
   return result
 }
 

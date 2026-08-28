@@ -11,8 +11,14 @@ describe('isOpenCodeGo', () => {
     expect(isOpenCodeGo(OCGO_PROVIDER)).toBe(true)
   })
 
-  it('accepts the opencode-go/ model prefix', () => {
+  it('accepts every provider containing opencode', () => {
     expect(isOpenCodeGo('opencode-go/deepseek-v4-flash')).toBe(true)
+    expect(isOpenCodeGo('opencode-go-ox')).toBe(true)
+    expect(isOpenCodeGo('opencode-go-ox/ox-alpha-free')).toBe(true)
+    expect(isOpenCodeGo('opencode-zen-go')).toBe(true)
+    expect(isOpenCodeGo('opencode-zen-go/deepseek-v4-flash')).toBe(true)
+    expect(isOpenCodeGo('custom-opencode-route/future-model')).toBe(true)
+    expect(isOpenCodeGo('OpenCode-Other')).toBe(true)
   })
 
   it('rejects other providers and empty input', () => {
@@ -22,7 +28,7 @@ describe('isOpenCodeGo', () => {
     expect(isOpenCodeGo('')).toBe(false)
   })
 
-  it('does not treat a plain-prefixed unrelated provider as opencode-go', () => {
-    expect(isOpenCodeGo('opencode-go-evil')).toBe(false)
+  it('also accepts future OpenCode-prefixed provider names', () => {
+    expect(isOpenCodeGo('opencode-go-evil')).toBe(true)
   })
 })

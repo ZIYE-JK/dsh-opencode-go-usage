@@ -89,6 +89,40 @@ describe('fromSSRHTML', () => {
     expect(parsed.monthly).toBeUndefined()
   })
 
+  it('parses current serialized usage references', () => {
+    const page = `
+      <script>
+        rollingUsage:$R[34],weeklyUsage:$R[35],monthlyUsage:$R[36]
+        $R[34]={status:"ok",resetInSec:18000,usagePercent:7,limit:3000000000}
+        $R[35]={status:"ok",resetInSec:360000,usagePercent:12,limit:3000000000}
+        $R[36]={status:"ok",resetInSec:2500000,usagePercent:9,limit:3000000000}
+      </script>`
+    expect(fromSSRHTML(page)).toEqual({
+      rolling: { kind: 'rolling', percent: 7, resetInSec: 18000, status: 'ok' },
+      weekly: { kind: 'weekly', percent: 12, resetInSec: 360000, status: 'ok' },
+      monthly: { kind: 'monthly', percent: 9, resetInSec: 2500000, status: 'ok' },
+    })
+  })
+
+  it('prefers live serialized values over stale data-slot markup', () => {
+    const page = `
+      <div data-slot="usage-item">
+        <span data-slot="usage-label">Monthly Usage</span>
+        <span data-slot="usage-value"><!--$-->100<!--/-->%</span>
+        <span data-slot="reset-time"><!--$-->Resets in<!--/-->15 days 21 hours<!--/--></span>
+      </div>
+      monthlyUsage:$R[36]
+      $R[36]={status:"ok",resetInSec:1370000,usagePercent:9}
+    `
+    expect(fromSSRHTML(page).monthly).toEqual({
+      kind: 'monthly', percent: 9, resetInSec: 1370000, status: 'ok',
+    })
+  })
+
+  it('does not treat serialized initialization placeholders as usage', () => {
+    expect(fromSSRHTML('monthlyUsage:0')).toEqual({})
+  })
+
   it('clamps percent into [0, 100]', () => {
     const page = `
       <div data-slot="usage-item">
