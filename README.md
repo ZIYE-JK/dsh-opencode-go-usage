@@ -11,7 +11,7 @@
 它是 [pi-ocgo-usage](https://github.com/v587d/pi-ocgo-usage)（Pi 插件）的 Web 对应物：三个用量窗口（5h 滚动 / 每周 / 每月）的百分比与重置倒计时，按阈值变色，让你在窗口耗尽、请求被限流之前就发现。
 
 ```
-OpenCode Go: 🕔 0% (1h 23m) · 7️⃣ 65% (2d 20h) · 🈷️ 83% (6d 21h) · upd 20:15
+OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) · ⏳ 2.4%/天 · upd 16:10
 ```
 
 本仓库是 [v587d/dsh-opencode-go-usage](https://github.com/v587d/dsh-opencode-go-usage)（MIT）的定制分支，在上游基础上增加了三处定制（见[与上游的差异](#与上游的差异)）。

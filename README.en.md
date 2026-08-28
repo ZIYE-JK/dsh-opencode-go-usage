@@ -11,7 +11,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bu
 It is the Web counterpart of [pi-ocgo-usage](https://github.com/v587d/pi-ocgo-usage) (a Pi plugin): percentage and reset countdown for the three usage windows (rolling 5h / weekly / monthly), color-coded by threshold, so you notice before a window runs out and requests get rate-limited.
 
 ```
-OpenCode Go: 🕔 0% (1h 23m) · 7️⃣ 65% (2d 20h) · 🈷️ 83% (6d 21h) · upd 20:15
+OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) · ⏳ 2.4%/day · upd 16:10
 ```
 
 This repository is a customized fork of [v587d/dsh-opencode-go-usage](https://github.com/v587d/dsh-opencode-go-usage) (MIT). See [Differences from upstream](#differences-from-upstream).
