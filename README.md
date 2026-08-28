@@ -23,7 +23,7 @@ OpenCode Go: 🕔 0% (1h 23m) · 7️⃣ 65% (2d 20h) · 🈷️ 83% (6d 21h) ·
 - **每日剩余** —— 按月窗口折算的 `⏳ x.x%/天`，告诉你接下来每天平均还能用多少（<3%/天 红色、<5%/天 黄色）
 - **数据新鲜度** —— `upd HH:MM` 显示最近一次成功抓取时间
 - **轻量轮询** —— 每 10s 轮询（切回标签页立即刷新）；host 端 300s 缓存（TTL 可配）+ 60s 失败冷却，不会频繁打扰 opencode.ai
-- **Provider 感知** —— 仅当会话当前模型走 `opencode-go` provider 时显示；每次轮询读取内存中的实时模型选择（`session.models`，毫秒级），切到 DeepSeek 官方等其它 provider 后一个轮询周期内自动隐藏，切回自动恢复（与 pi-ocgo-usage 行为一致）
+- **Provider 感知** —— 仅当会话当前模型的 provider 名称包含 `opencode`（不区分大小写）时显示；每次轮询读取内存中的实时模型选择（`session.models`，毫秒级），因此 `opencode-go`、`opencode-zen-go` 及未来 OpenCode 路由均会自动显示，切到不含 `opencode` 的 provider 后一个轮询周期内自动隐藏
 - **浮动 chip** —— chip 逐帧跟随输入框卡片（rAF），调整侧边栏宽度或滚动页面时始终与卡片保持固定像素偏移；可按住拖拽微调位置、点锁形按钮固定（位置与锁定状态持久化在 localStorage）
 - **点击展开** —— 详情面板显示每个窗口的重置倒计时，左下角 `set` 可配置凭据，右侧 `refresh upd HH:MM` 手动刷新
 - **内置凭据编辑器** —— 无需碰终端：`set` 面板直接修改 workspace id 与 cookie（输入框以 `••••` + 末尾 4 位显示，点击外部 / Esc / 保存确认写入）
@@ -41,6 +41,8 @@ OpenCode Go: 🕔 0% (1h 23m) · 7️⃣ 65% (2d 20h) · 🈷️ 83% (6d 21h) ·
 | chip 窗口标签图标化 | `5h / wk / mo` 文本标签改为 `🕔 / 7️⃣ / 🈷️` 图标（详情面板仍为完整文字） |
 | chip 跟随输入框卡片 | 逐帧 rAF 钉在卡片上（`position: fixed` 坐标 = 卡片位置 + 用户偏移），拖拽移动、锁形按钮固定；偏移持久化于 `dsh.ocgoChip.offset`（旧 `dsh.ocgoChip.pos` 一次性迁移） |
 | 每日剩余指标 | 按月窗口折算 `⏳ x.x%/天`，按 <3%/<5% 阈值变色（新增 `segOk` 样式） |
+| 当前 OpenCode 页面解析 | 兼容 `rollingUsage` / `weeklyUsage` / `monthlyUsage` 指向的 `$R[n]` 序列化对象，从 `usagePercent` 与 `resetInSec` 读取实时值；与旧 `data-slot` DOM 同时存在时，实时序列化值优先，避免旧壳层错误显示月度 100% |
+| OpenCode provider 通配 | 只要当前 provider 名称包含 `opencode`（不区分大小写）就展示 chip，支持 `opencode-zen-go` 及未来 OpenCode 路由 |
 | 运行时依赖修复 | `@deepseek-ai/cordis` 移入 `dependencies`（link 安装时 npm 不自动装 peer 依赖导致启动失败的问题） |
 
 ## 环境要求
@@ -143,8 +145,8 @@ chmod 600 ~/.dsh/ocgo-usage.json
 
 ## 工作原理
 
-- **Host 半**（`src/index.ts`、`src/service.ts`、`src/api.ts`、`src/routes.ts`）—— 携带 cookie 抓取 `GET /workspace/<wrk>/go`，解析 SSR 渲染的 `data-slot="usage-item"` 块为每个窗口的 `{percent, resetInSec, status}`，缓存结果，通过同源 JSON 端点 `/api/ocgo-usage`（+ `/api/ocgo-usage/refresh`、`/api/ocgo-usage/config`）提供数据。
-- **浏览器半**（`src/client/`）—— 向 `conversation.composer.dock` slot 注册 chip，每 10s 轮询 host 端点，按严重级别着色渲染三个窗口；可见性来自 `session.models` 的实时 provider 判断；chip 位置由 `src/client/OcgoDockEntry.tsx` 中的 rAF 跟随逻辑逐帧钉在输入框卡片上。
+- **Host 半**（`src/index.ts`、`src/service.ts`、`src/api.ts`、`src/routes.ts`）—— 携带 cookie 抓取 `GET /workspace/<wrk>/go`；兼容旧 SSR `data-slot="usage-item"` 块，也兼容当前 `rollingUsage` / `weeklyUsage` / `monthlyUsage` → `$R[n]` 的序列化对象，读取其中的 `usagePercent` 与 `resetInSec`。两种格式同时存在时优先采用实时序列化值，避免旧 DOM 壳层误报月度 100%。结果缓存后通过同源 JSON 端点 `/api/ocgo-usage`（+ `/api/ocgo-usage/refresh`、`/api/ocgo-usage/config`）提供数据。
+- **浏览器半**（`src/client/`）—— 向 `conversation.composer.dock` slot 注册 chip，每 10s 轮询 host 端点，按严重级别着色渲染三个窗口；当 `session.models` 中的实时 provider 名称包含 `opencode`（不区分大小写）时显示；chip 位置由 `src/client/OcgoDockEntry.tsx` 中的 rAF 跟随逻辑逐帧钉在输入框卡片上。
 
 浏览器永远看不到 cookie；抓取与解析全部在 host 侧完成。
 
