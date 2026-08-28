@@ -1,4 +1,4 @@
-# dsh-ocgo-usage
+# dsh-opencode-go-usage
 
 [English](README.en.md) | 中文
 
