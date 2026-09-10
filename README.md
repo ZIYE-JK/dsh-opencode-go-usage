@@ -4,7 +4,7 @@
 
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-![Footer demo](assets/custom-footer.png)
+![横排 chip（默认布局）](assets/chip-inline.png)
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle**，在 Web 界面的输入框上方 dock（与内置 token 统计同位置）显示 [OpenCode Go](https://opencode.ai/docs/go/) 订阅用量。
 
@@ -15,6 +15,8 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 ```
 
 竖排（点 chip 上的图标按钮切换，选择会被记住）：
+
+![竖排 chip（卡片布局）](assets/chip-stacked.png)
 
 ```
 ⚡ Go: upd 16:10

@@ -4,7 +4,7 @@ English | [中文](README.md)
 
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-![Footer demo](assets/custom-footer.png)
+![Inline chip (default layout)](assets/chip-inline.png)
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle** that shows your [OpenCode Go](https://opencode.ai/docs/go/) subscription usage in the composer dock above the input bar (same spot as the built-in token stats).
 
@@ -15,6 +15,8 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 ```
 
 Stacked layout (toggle it with the icon button on the chip; the choice is remembered):
+
+![Stacked chip (card layout)](assets/chip-stacked.png)
 
 ```
 ⚡ Go: upd 16:10
