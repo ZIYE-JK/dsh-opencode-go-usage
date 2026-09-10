@@ -30,7 +30,7 @@ This repository is a customized fork of [v587d/dsh-opencode-go-usage](https://gi
 
 ## Features
 
-- **Three windows** — rolling 5h / weekly / monthly percentage + reset countdown
+- **Three windows** — rolling 5h / weekly / monthly percentage (**one decimal place**, matching the console) + reset countdown
 - **Color thresholds** — normal → yellow warning (≥80%) → red error (≥90% or rate-limited)
 - **Daily remaining** — `⏳ x.x%/day` derived from the monthly window, telling you the average you can spend per day (red <3%/day, yellow <5%/day)
 - **Freshness** — `upd HH:MM` shows the last successful fetch time
@@ -54,6 +54,7 @@ Relative to [v587d/dsh-opencode-go-usage](https://github.com/v587d/dsh-opencode-
 | Iconized window labels | `5h / wk / mo` text labels replaced with `🕔 / 7️⃣ / 🈷️` icons (the detail panel keeps full text) |
 | Chip follows the input card | A rAF loop pins the chip to the card (`position: fixed` coordinates = card position + user offset); drag to move, lock button to pin; offset persisted under `dsh.ocgoChip.offset` (legacy `dsh.ocgoChip.pos` migrated once) |
 | Daily remaining metric | `⏳ x.x%/day` derived from the monthly window, color-coded at <3%/<5% thresholds (new `segOk` style) |
+| Percentage precision | Keeps one decimal place (upstream floored to integers): the fractional `usagePercent` is preserved, and a fractional `10.5%` inside the legacy `data-slot` text is parsed too, so the chip matches the percentage shown on the OpenCode console |
 | Current OpenCode page parser | Supports serialized `rollingUsage` / `weeklyUsage` / `monthlyUsage` `$R[n]` objects and reads their live `usagePercent` and `resetInSec`; when present alongside legacy `data-slot` DOM, the live serialized value wins to avoid a stale monthly 100% shell |
 | OpenCode provider wildcard | Shows the chip whenever the current provider name contains `opencode` (case-insensitive), covering `opencode-zen-go` and future OpenCode routes |
 | Inline / stacked layouts | A layout toggle button on the chip switches between the inline line (default) and a stacked card (`⚡ Go: upd HH:MM` + one line per window + the `⏳` line, action icons on the last line); the stacked card is height-compensated so its bottom edge stays put while it grows upward; the choice persists under `dsh.ocgoChip.layout` |
@@ -80,8 +81,8 @@ Because `lib/` is committed to the repository, pnpm installs the built package d
 ### From tarball
 
 ```sh
-pnpm pack            # inside this repo → dsh-ocgo-usage-0.1.2.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.2.tgz
+pnpm pack            # inside this repo → dsh-ocgo-usage-0.1.3.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.3.tgz
 ```
 
 ### Local development install

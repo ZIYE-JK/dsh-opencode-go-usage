@@ -123,6 +123,37 @@ describe('fromSSRHTML', () => {
     expect(fromSSRHTML('monthlyUsage:0')).toEqual({})
   })
 
+  it('keeps one decimal place from serialized usagePercent', () => {
+    const page = `
+      rollingUsage:$R[34],weeklyUsage:$R[35]
+      $R[34]={status:"ok",resetInSec:18000,usagePercent:10.5}
+      $R[35]={status:"ok",resetInSec:360000,usagePercent:10.53}
+    `
+    expect(fromSSRHTML(page)).toEqual({
+      rolling: { kind: 'rolling', percent: 10.5, resetInSec: 18000, status: 'ok' },
+      weekly: { kind: 'weekly', percent: 10.5, resetInSec: 360000, status: 'ok' },
+    })
+  })
+
+  it('keeps one decimal place from data-slot markup', () => {
+    const page = `
+      <div data-slot="usage-item">
+        <span data-slot="usage-label">Rolling Usage</span>
+        <span data-slot="usage-value"><!--$-->10.5<!--/-->%</span>
+        <span data-slot="reset-time"><!--$-->Resets in<!--/-->2 hours 29 minutes<!--/--></span>
+      </div>`
+    expect(fromSSRHTML(page).rolling?.percent).toBe(10.5)
+  })
+
+  it('clamps a fractional percent into [0, 100]', () => {
+    const page = `
+      <div data-slot="usage-item">
+        <span data-slot="usage-label">Monthly Usage</span>
+        <span data-slot="usage-value"><!--$-->100.5<!--/-->%</span>
+      </div>`
+    expect(fromSSRHTML(page).monthly?.percent).toBe(100)
+  })
+
   it('clamps percent into [0, 100]', () => {
     const page = `
       <div data-slot="usage-item">

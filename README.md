@@ -30,7 +30,7 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 
 ## 特性
 
-- **三个窗口** —— 5h 滚动 / 每周 / 每月 的百分比 + 重置倒计时
+- **三个窗口** —— 5h 滚动 / 每周 / 每月 的百分比（**保留 1 位小数**，与官网一致）+ 重置倒计时
 - **颜色阈值** —— 正常 → 黄色警告（≥80%）→ 红色错误（≥90% 或已限流）
 - **每日剩余** —— 按月窗口折算的 `⏳ x.x%/天`，告诉你接下来每天平均还能用多少（<3%/天 红色、<5%/天 黄色）
 - **数据新鲜度** —— `upd HH:MM` 显示最近一次成功抓取时间
@@ -54,6 +54,7 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 | chip 窗口标签图标化 | `5h / wk / mo` 文本标签改为 `🕔 / 7️⃣ / 🈷️` 图标（详情面板仍为完整文字） |
 | chip 跟随输入框卡片 | 逐帧 rAF 钉在卡片上（`position: fixed` 坐标 = 卡片位置 + 用户偏移），拖拽移动、锁形按钮固定；偏移持久化于 `dsh.ocgoChip.offset`（旧 `dsh.ocgoChip.pos` 一次性迁移） |
 | 每日剩余指标 | 按月窗口折算 `⏳ x.x%/天`，按 <3%/<5% 阈值变色（新增 `segOk` 样式） |
+| 百分比精度 | 保留 1 位小数（上游 `Math.floor` 取整丢精度）：`usagePercent` 的小数被完整保留，旧 `data-slot` 文本里的 `10.5%` 也能解析，与 OpenCode 官网显示的百分比一致 |
 | 当前 OpenCode 页面解析 | 兼容 `rollingUsage` / `weeklyUsage` / `monthlyUsage` 指向的 `$R[n]` 序列化对象，从 `usagePercent` 与 `resetInSec` 读取实时值；与旧 `data-slot` DOM 同时存在时，实时序列化值优先，避免旧壳层错误显示月度 100% |
 | OpenCode provider 通配 | 只要当前 provider 名称包含 `opencode`（不区分大小写）就展示 chip，支持 `opencode-zen-go` 及未来 OpenCode 路由 |
 | 横/竖排切换 | chip 新增布局切换按钮：横排（默认，一行）或竖排卡片（`⚡ Go: upd HH:MM` + 三个窗口各一行 + `⏳` 一行，操作图标在末行右侧）；竖排按高度差补偿，保持底边不动向上生长；选择持久化于 `dsh.ocgoChip.layout` |
@@ -80,8 +81,8 @@ dsh plugin --profile web add github:ZIYE-JK/dsh-ocgo-usage
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.2.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.2.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.3.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.3.tgz
 ```
 
 ### 本地开发安装

@@ -124,13 +124,13 @@ export function fromSSRHTML(html: string): Omit<NormalizedUsage, 'updatedAt'> {
   for (let i = 0; i < starts.length; i++) {
     const block = html.slice(starts[i], starts[i + 1] ?? html.length)
     const labelMatch = block.match(/data-slot="usage-label"[^>]*>([^<]+)</)
-    const valueMatch = block.match(/data-slot="usage-value"[\s\S]*?<!--\$-->\s*(\d+)\s*<!--\/-->/)
+    const valueMatch = block.match(/data-slot="usage-value"[\s\S]*?<!--\$-->\s*(\d+(?:\.\d+)?)\s*<!--\/-->/)
     const resetMatch = block.match(
       /data-slot="reset-time"[\s\S]*?Resets in(?:<!--\/-->\s*)?([\s\S]*?)(?:<!--\/-->|<\/span>)/,
     )
     if (!labelMatch || !valueMatch) continue
     const label = labelMatch[1]?.trim() ?? ''
-    const percent = Number.parseInt(valueMatch[1] ?? '0', 10)
+    const percent = Number.parseFloat(valueMatch[1] ?? '0')
     const resetsIn = resetMatch ? stripHtmlComments(resetMatch[1] ?? '').trim() : ''
     items.push({ label, percent, resetsIn })
   }
@@ -287,7 +287,10 @@ export async function fetchUsage(cfg: OcgoConfig): Promise<NormalizedUsage> {
 // Internal helpers
 // ============================================================================
 
+/** Clamp into [0, 100], keeping one decimal place: the OpenCode console shows
+ * fractional percentages (e.g. `10.5%`), and `Math.floor` used to throw that
+ * precision away before it could ever reach the chip. */
 function clampPercent(n: number | undefined): number {
   if (n === undefined) return 0
-  return Math.max(0, Math.min(100, Math.floor(n)))
+  return Math.max(0, Math.min(100, Math.round(n * 10) / 10))
 }
