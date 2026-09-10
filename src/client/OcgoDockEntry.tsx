@@ -113,13 +113,17 @@ function severityClass(window: UsageWindow): string | undefined {
   return undefined
 }
 
-/** Render one window segment: `· 5h 23% (3h 25m)`. */
-function WindowSegment(props: { window: UsageWindow; sep: string }): React.ReactElement {
+/**
+ * Render one window segment: inline `· 🕔 23% (3h 25m)`, or a bare
+ * `🕔 23% (3h 25m)` line in the stacked layout (no separator).
+ * @param props - the window plus the inline separator (omit for stacked).
+ */
+function WindowSegment(props: { window: UsageWindow; sep?: string }): React.ReactElement {
   const { window, sep } = props
   const cls = severityClass(window)
   return (
     <span className={css.seg}>
-      <span className={css.segSep}>{sep}</span>
+      {sep !== undefined && sep !== '' && <span className={css.segSep}>{sep}</span>}
       <span className={cls ?? undefined}>
         {WINDOW_LABELS[window.kind]} {window.percent}% ({formatDuration(window.resetInSec)})
       </span>
@@ -181,6 +185,19 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
     return null
   })
   const [locked, setLocked] = useState(() => window.localStorage.getItem('dsh.ocgoChip.locked') === '1')
+  /** Chip layout: one inline line ("row", the default) or one metric per line
+   * ("col"). Toggled from the chip, persisted under "dsh.ocgoChip.layout". */
+  const [layout, setLayout] = useState<'row' | 'col'>(() =>
+    window.localStorage.getItem('dsh.ocgoChip.layout') === 'col' ? 'col' : 'row')
+  const toggleLayout = useCallback(() => {
+    setLayout((prev) => {
+      const next = prev === 'row' ? 'col' : 'row'
+      try {
+        window.localStorage.setItem('dsh.ocgoChip.layout', next)
+      } catch { /* storage unavailable */ }
+      return next
+    })
+  }, [])
   const dragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, baseLeft: 0, baseTop: 0 })
   const posRef = useRef(pos)
   posRef.current = pos
@@ -228,6 +245,29 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
     } catch { /* storage unavailable */ }
     if (posRef.current !== null) setPos(null)
   }, [visible])
+
+  /** Keep the chip's BOTTOM edge anchored across height changes: the follower
+   * anchors the top-left corner, so a taller stacked chip would otherwise grow
+   * downward over the composer card. Shifting the offset by the height delta
+   * leaves the resting place (just above the card) intact in both layouts.
+   * Deliberately dependency-free: it re-measures after every render (one rect
+   * read) so a layout toggle, an error state, or the daily line appearing all
+   * keep the bottom edge put. */
+  const layoutHeightRef = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current
+    if (wrap === null) return
+    const height = Math.round(wrap.getBoundingClientRect().height)
+    const prev = layoutHeightRef.current
+    layoutHeightRef.current = height
+    const offset = offsetRef.current
+    if (prev === null || prev === height || offset === null) return
+    offsetRef.current = { x: offset.x, y: offset.y + (prev - height) }
+    chipStyleRef.current = null
+    try {
+      window.localStorage.setItem('dsh.ocgoChip.offset', JSON.stringify(offsetRef.current))
+    } catch { /* storage unavailable */ }
+  })
 
   /** Follow the input card every frame: the chip keeps the same pixel delta
    * from the card while the sidebar width changes or the page scrolls.
@@ -566,6 +606,46 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
   ].filter((w): w is UsageWindow => w !== undefined)
   const daily = dailyRemaining(snapshot.monthly)
   const dailyCls = daily === null ? undefined : dailySeverityClass(daily)
+  const col = layout === 'col'
+  /** The trailing icon cluster (layout toggle + lock pin): the inline chip
+   * renders it last, the stacked chip on its last line. */
+  const iconButtons = (
+    <span className={css.iconBtns}>
+      <span
+        className={css.lockBtn}
+        role="button"
+        title={col ? t('ocgo.layoutToRow') : t('ocgo.layoutToCol')}
+        data-testid="ocgo-layout-toggle"
+        onClick={(e) => { e.stopPropagation(); toggleLayout() }}
+      >
+        {col ? (
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="8.5" width="18" height="7" rx="3.5" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        )}
+      </span>
+      <span
+        className={css.lockBtn}
+        role="button"
+        title={locked ? t('ocgo.unlock') : t('ocgo.lock')}
+        onClick={(e) => { e.stopPropagation(); toggleLock() }}
+      >
+        {locked ? (
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z" />
+          </svg>
+        )}
+      </span>
+    </span>
+  )
 
   // No windows at all (e.g. brand-new account): show unavailable, refreshable.
   if (windows.length === 0) {
@@ -592,7 +672,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
     >
       <button
         type="button"
-        className={open ? `${css.chip} ${css.chipOpen}` : css.chip}
+        className={[css.chip, col ? css.chipCol : '', open ? css.chipOpen : ''].filter((c) => c !== '').join(' ')}
         onClick={() => {
           if (dragRef.current.moved) {
             dragRef.current.moved = false
@@ -603,35 +683,44 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
         }}
         title={open ? t('ocgo.collapse') : t('ocgo.expand')}
       >
-        <span>{t('ocgo.label')}:</span>
-        {windows.map((w) => (
-          <WindowSegment key={w.kind} window={w} sep={sep} />
-        ))}
-        {daily !== null && (
-          <span className={css.seg}>
-            <span className={css.segSep}>{sep}</span>
-            <span className={dailyCls ?? undefined}>⏳ {daily.toFixed(1)}%/天</span>
-          </span>
+        {col ? (
+          <>
+            <span className={css.colHead}>
+              <span>{t('ocgo.labelShort')}:</span>
+              {snapshot.updatedAt !== undefined && (
+                <span className={css.segSep}>{t('ocgo.fetchedAt', { time: formatClock(snapshot.updatedAt) })}</span>
+              )}
+            </span>
+            {windows.map((w) => (
+              <WindowSegment key={w.kind} window={w} />
+            ))}
+            <span className={css.colFoot}>
+              {daily !== null && (
+                <span className={css.seg}>
+                  <span className={dailyCls ?? undefined}>⏳ {daily.toFixed(1)}%/天</span>
+                </span>
+              )}
+              {iconButtons}
+            </span>
+          </>
+        ) : (
+          <>
+            <span>{t('ocgo.label')}:</span>
+            {windows.map((w) => (
+              <WindowSegment key={w.kind} window={w} sep={sep} />
+            ))}
+            {daily !== null && (
+              <span className={css.seg}>
+                <span className={css.segSep}>{sep}</span>
+                <span className={dailyCls ?? undefined}>⏳ {daily.toFixed(1)}%/天</span>
+              </span>
+            )}
+            {snapshot.updatedAt !== undefined && (
+              <span className={css.segSep}>{sep}{t('ocgo.fetchedAt', { time: formatClock(snapshot.updatedAt) })}</span>
+            )}
+            {iconButtons}
+          </>
         )}
-        {snapshot.updatedAt !== undefined && (
-          <span className={css.segSep}>{sep}{t('ocgo.fetchedAt', { time: formatClock(snapshot.updatedAt) })}</span>
-        )}
-        <span
-          className={css.lockBtn}
-          role="button"
-          title={locked ? '取消固定' : '固定'}
-          onClick={(e) => { e.stopPropagation(); toggleLock() }}
-        >
-          {locked ? (
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z" />
-            </svg>
-          )}
-        </span>
       </button>
       {open && (
         <span className={css.details}>

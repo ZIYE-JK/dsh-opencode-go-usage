@@ -54,6 +54,47 @@
   white-space: nowrap;
 }
 
+/* The trailing icon cluster: layout toggle + lock pin. */
+.iconBtns {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.iconBtns .lockBtn {
+  margin-left: 0;
+}
+
+/* Stacked chip: one metric per line, left-aligned card (layout toggle). */
+.chipCol {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  height: auto;
+  padding: 5px 8px;
+  border-radius: 10px;
+}
+
+/* The stacked chip's first line: short label + fetch time. */
+.colHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The stacked chip's last line: daily average left, icon cluster right. */
+.colFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.colFoot .iconBtns {
+  margin-left: auto;
+}
+
 .seg {
   display: inline-flex;
   align-items: baseline;

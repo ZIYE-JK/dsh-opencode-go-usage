@@ -7,6 +7,7 @@ export declare const NS = "ocgo";
 /** Chinese copy. */
 export declare const zh: {
     readonly 'ocgo.label': "OpenCode Go";
+    readonly 'ocgo.labelShort': "⚡ Go";
     readonly 'ocgo.unavailable': "用量不可用";
     readonly 'ocgo.error': "查询失败：{code}";
     readonly 'ocgo.noconfig': "未配置：请设置 OPENCODE_GO_COOKIE 与 OPENCODE_GO_WORKSPACE_ID（或 $DSH_HOME/ocgo-usage.json）";
@@ -19,6 +20,10 @@ export declare const zh: {
     readonly 'ocgo.resetsIn': "剩余 {duration}";
     readonly 'ocgo.expand': "展开用量详情";
     readonly 'ocgo.collapse': "收起";
+    readonly 'ocgo.layoutToCol': "切换为竖排";
+    readonly 'ocgo.layoutToRow': "切换为横排";
+    readonly 'ocgo.lock': "固定";
+    readonly 'ocgo.unlock': "取消固定";
     readonly 'ocgo.sep': "·";
     readonly 'ocgo.set': "设置";
     readonly 'ocgo.save': "保存";
@@ -29,6 +34,7 @@ export declare const zh: {
 /** English copy. */
 export declare const en: {
     readonly 'ocgo.label': "OpenCode Go";
+    readonly 'ocgo.labelShort': "⚡ Go";
     readonly 'ocgo.unavailable': "usage unavailable";
     readonly 'ocgo.error': "Query failed: {code}";
     readonly 'ocgo.noconfig': "Not configured: set OPENCODE_GO_COOKIE and OPENCODE_GO_WORKSPACE_ID (or $DSH_HOME/ocgo-usage.json)";
@@ -41,6 +47,10 @@ export declare const en: {
     readonly 'ocgo.resetsIn': "resets in {duration}";
     readonly 'ocgo.expand': "Show usage details";
     readonly 'ocgo.collapse': "Collapse";
+    readonly 'ocgo.layoutToCol': "Switch to stacked layout";
+    readonly 'ocgo.layoutToRow': "Switch to inline layout";
+    readonly 'ocgo.lock': "Pin";
+    readonly 'ocgo.unlock': "Unpin";
     readonly 'ocgo.sep': "·";
     readonly 'ocgo.set': "Set";
     readonly 'ocgo.save': "Save";
