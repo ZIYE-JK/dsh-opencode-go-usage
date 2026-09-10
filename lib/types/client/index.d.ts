@@ -9,11 +9,12 @@
  * compact `<err:code>` state with a manual refresh action.
  *
  * Provider visibility is decided CLIENT-side from the live model selection:
- * `session.models` reads the in-memory current selection (2-3 ms warm, no
+ * the `modelSelection` session projection is read in memory (~ms, no
  * network), so switching models via `/model` is reflected on the very next
  * poll — the host's request-header fold lags until the next real request,
  * which is why visibility does not ride the usage endpoint. The chip renders
- * nothing while the current provider is not `opencode-go`, mirroring
+ * nothing only while the current provider is POSITIVELY known not to be
+ * `opencode-go`; an unreadable selection keeps it visible, mirroring
  * pi-ocgo-usage.
  * @module dsh-ocgo-usage/client
  */
@@ -36,10 +37,21 @@ export interface OcgoInjected {
     dockSessionId: string | undefined;
     /**
      * Resolve the CURRENT model provider of the dock's session from the live
-     * in-memory selection (`session.models`, warm ~ms). Undefined when the
-     * session has no selection yet.
+     * in-memory `modelSelection` projection (warm ~ms, no network). Undefined
+     * when the session has no selection yet.
      */
     provider(): Promise<string | undefined>;
+}
+/** The projected model-selection view of one session (`next` = pending ?? lastUsed). */
+export interface ModelSelectionView {
+    /** Selection intent not yet confirmed by a request header. */
+    next?: {
+        provider?: string | undefined;
+    } | null | undefined;
+    /** Selection confirmed by the session's last request header. */
+    lastUsed?: {
+        provider?: string | undefined;
+    } | null | undefined;
 }
 /**
  * Register the usage chip into the composer dock band.

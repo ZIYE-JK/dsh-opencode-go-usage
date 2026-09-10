@@ -23,7 +23,7 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 - **每日剩余** —— 按月窗口折算的 `⏳ x.x%/天`，告诉你接下来每天平均还能用多少（<3%/天 红色、<5%/天 黄色）
 - **数据新鲜度** —— `upd HH:MM` 显示最近一次成功抓取时间
 - **轻量轮询** —— 每 10s 轮询（切回标签页立即刷新）；host 端 300s 缓存（TTL 可配）+ 60s 失败冷却，不会频繁打扰 opencode.ai
-- **Provider 感知** —— 仅当会话当前模型的 provider 名称包含 `opencode`（不区分大小写）时显示；每次轮询读取内存中的实时模型选择（`session.models`，毫秒级），因此 `opencode-go`、`opencode-zen-go` 及未来 OpenCode 路由均会自动显示，切到不含 `opencode` 的 provider 后一个轮询周期内自动隐藏
+- **Provider 感知** —— 仅当会话当前模型的 provider 名称包含 `opencode`（不区分大小写）时显示；每次轮询读取实时模型选择（`modelSelection` 会话投影，毫秒级、不联网），因此 `opencode-go`、`opencode-zen-go` 及未来 OpenCode 路由均会自动显示，切到不含 `opencode` 的 provider 后一个轮询周期内自动隐藏；provider 读不到时（会话尚未绑定、上游 API 变动）保持显示，不再静默隐藏
 - **浮动 chip** —— chip 逐帧跟随输入框卡片（rAF），调整侧边栏宽度或滚动页面时始终与卡片保持固定像素偏移；可按住拖拽微调位置、点锁形按钮固定（位置与锁定状态持久化在 localStorage）
 - **点击展开** —— 详情面板显示每个窗口的重置倒计时，左下角 `set` 可配置凭据，右侧 `refresh upd HH:MM` 手动刷新
 - **内置凭据编辑器** —— 无需碰终端：`set` 面板直接修改 workspace id 与 cookie（输入框以 `••••` + 末尾 4 位显示，点击外部 / Esc / 保存确认写入）
@@ -44,10 +44,11 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 | 当前 OpenCode 页面解析 | 兼容 `rollingUsage` / `weeklyUsage` / `monthlyUsage` 指向的 `$R[n]` 序列化对象，从 `usagePercent` 与 `resetInSec` 读取实时值；与旧 `data-slot` DOM 同时存在时，实时序列化值优先，避免旧壳层错误显示月度 100% |
 | OpenCode provider 通配 | 只要当前 provider 名称包含 `opencode`（不区分大小写）就展示 chip，支持 `opencode-zen-go` 及未来 OpenCode 路由 |
 | 运行时依赖修复 | `@deepseek-ai/cordis` 移入 `dependencies`（link 安装时 npm 不自动装 peer 依赖导致启动失败的问题） |
+| DSH 0.1.5 兼容修复 | 会话 provider 改从 `modelSelection` 会话投影读取（旧 `connection.api.sessions.models` RPC 已在 DSH 0.1.5 移除，旧写法会让 chip 静默消失）；provider 读不到时不再隐藏 chip |
 
 ## 环境要求
 
-- DeepSeek Harness `0.1.0-rc.6` 或更新（web profile）
+- DeepSeek Harness `0.1.5-rc.1` 或更新（web profile）—— provider 读取依赖 `modelSelection` 会话投影，旧的 `connection.api.sessions.models` RPC 已在 0.1.5 移除
 - `PATH` 上有 pnpm（`dsh plugin` 需要）
 
 ## 安装
@@ -65,8 +66,8 @@ dsh plugin --profile web add github:ZIYE-JK/dsh-ocgo-usage
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.0.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.0.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.1.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.1.tgz
 ```
 
 ### 本地开发安装
@@ -146,7 +147,7 @@ chmod 600 ~/.dsh/ocgo-usage.json
 ## 工作原理
 
 - **Host 半**（`src/index.ts`、`src/service.ts`、`src/api.ts`、`src/routes.ts`）—— 携带 cookie 抓取 `GET /workspace/<wrk>/go`；兼容旧 SSR `data-slot="usage-item"` 块，也兼容当前 `rollingUsage` / `weeklyUsage` / `monthlyUsage` → `$R[n]` 的序列化对象，读取其中的 `usagePercent` 与 `resetInSec`。两种格式同时存在时优先采用实时序列化值，避免旧 DOM 壳层误报月度 100%。结果缓存后通过同源 JSON 端点 `/api/ocgo-usage`（+ `/api/ocgo-usage/refresh`、`/api/ocgo-usage/config`）提供数据。
-- **浏览器半**（`src/client/`）—— 向 `conversation.composer.dock` slot 注册 chip，每 10s 轮询 host 端点，按严重级别着色渲染三个窗口；当 `session.models` 中的实时 provider 名称包含 `opencode`（不区分大小写）时显示；chip 位置由 `src/client/OcgoDockEntry.tsx` 中的 rAF 跟随逻辑逐帧钉在输入框卡片上。
+- **浏览器半**（`src/client/`）—— 向 `conversation.composer.dock` slot 注册 chip，每 10s 轮询 host 端点，按严重级别着色渲染三个窗口；当 `modelSelection` 会话投影中的实时 provider 名称包含 `opencode`（不区分大小写）时显示（读不到 provider 时保持显示，不静默隐藏）；chip 位置由 `src/client/OcgoDockEntry.tsx` 中的 rAF 跟随逻辑逐帧钉在输入框卡片上。
 
 浏览器永远看不到 cookie；抓取与解析全部在 host 侧完成。
 

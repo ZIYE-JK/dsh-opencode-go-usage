@@ -272,7 +272,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
 
   // One periodic tick:
   //   1. resolve the session's CURRENT provider from the live in-memory
-  //      selection (session.models, warm ~ms) and toggle `visible`;
+  //      modelSelection projection (warm ~ms, no network) and toggle `visible`;
   //   2. only while visible, fetch the usage snapshot.
   const pollNow = useCallback(() => {
     let live = true
@@ -282,7 +282,11 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       : Promise.resolve(undefined)
     resolveProvider.then((p) => {
       if (!live) return
-      const shown = isOpenCodeGo(p)
+      // Safety net: only a provider we POSITIVELY resolved as non-OpenCode hides
+      // the chip. An unreadable one (undefined — a DSH API drift, or a session
+      // binding that is not ready yet) keeps it visible, so this readout can
+      // never disappear silently again the way it did on DSH 0.1.5-rc.1.
+      const shown = p === undefined ? true : isOpenCodeGo(p)
       setVisible(shown)
       if (!shown) setOpen(false)
       if (shown) {

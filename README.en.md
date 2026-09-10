@@ -1,4 +1,4 @@
-# dsh-ocgo-usage
+# dsh-opencode-go-usage
 
 English | [中文](README.md)
 
@@ -23,7 +23,7 @@ This repository is a customized fork of [v587d/dsh-opencode-go-usage](https://gi
 - **Daily remaining** — `⏳ x.x%/day` derived from the monthly window, telling you the average you can spend per day (red <3%/day, yellow <5%/day)
 - **Freshness** — `upd HH:MM` shows the last successful fetch time
 - **Light polling** — polls every 10s (instant refresh when the tab regains focus); host-side 300s cache (configurable TTL) + 60s failure cooldown, so opencode.ai is not bothered too often
-- **Provider-aware** — shown whenever the session's current model provider name contains `opencode` (case-insensitive); reads the live in-memory model selection (`session.models`, millisecond-fresh) each poll, so `opencode-go`, `opencode-zen-go`, and future OpenCode routes appear automatically, while a provider without `opencode` hides within one poll interval
+- **Provider-aware** — shown whenever the session's current model provider name contains `opencode` (case-insensitive); reads the live in-memory model selection (the `modelSelection` session projection, millisecond-fresh, no network) each poll, so `opencode-go`, `opencode-zen-go`, and future OpenCode routes appear automatically, while a provider without `opencode` hides within one poll interval; an unreadable provider (session not bound yet, upstream API drift) keeps the chip visible instead of hiding it
 - **Floating chip** — the chip follows the composer input card frame-by-frame (rAF), keeping a fixed pixel offset from the card while the sidebar width changes or the page scrolls; drag it to fine-tune the position, click the lock button to pin it (position and lock state persist in localStorage)
 - **Click to expand** — the detail panel shows each window's reset countdown, a `set` editor for credentials at the bottom-left, and a manual `refresh upd HH:MM` at the right
 - **Built-in credential editor** — no terminal needed: the `set` panel edits the workspace id and cookie directly (inputs show `••••` + last 4 chars; click outside / Esc / Save confirms the write)
@@ -44,10 +44,11 @@ Relative to [v587d/dsh-opencode-go-usage](https://github.com/v587d/dsh-opencode-
 | Current OpenCode page parser | Supports serialized `rollingUsage` / `weeklyUsage` / `monthlyUsage` `$R[n]` objects and reads their live `usagePercent` and `resetInSec`; when present alongside legacy `data-slot` DOM, the live serialized value wins to avoid a stale monthly 100% shell |
 | OpenCode provider wildcard | Shows the chip whenever the current provider name contains `opencode` (case-insensitive), covering `opencode-zen-go` and future OpenCode routes |
 | Runtime dependency fix | `@deepseek-ai/cordis` moved into `dependencies` (npm does not auto-install peer deps for `link:` installs, which previously broke startup) |
+| DSH 0.1.5 compatibility fix | The session provider is now read from the `modelSelection` session projection (the old `connection.api.sessions.models` RPC was removed in DSH 0.1.5 and made the chip vanish silently); an unreadable provider no longer hides the chip |
 
 ## Requirements
 
-- DeepSeek Harness `0.1.0-rc.6` or newer (web profile)
+- DeepSeek Harness `0.1.5-rc.1` or newer (web profile) — the provider read uses the `modelSelection` session projection; the old `connection.api.sessions.models` RPC was removed in 0.1.5
 - `pnpm` on `PATH` (needed by `dsh plugin`)
 
 ## Installation
@@ -65,8 +66,8 @@ Because `lib/` is committed to the repository, pnpm installs the built package d
 ### From tarball
 
 ```sh
-pnpm pack            # inside this repo → dsh-ocgo-usage-0.1.0.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.0.tgz
+pnpm pack            # inside this repo → dsh-ocgo-usage-0.1.1.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.1.tgz
 ```
 
 ### Local development install
@@ -146,7 +147,7 @@ Click the chip to expand the detail panel: each window shows its full name, perc
 ## How it works
 
 - **Host half** (`src/index.ts`, `src/service.ts`, `src/api.ts`, `src/routes.ts`) — fetches `GET /workspace/<wrk>/go` with the cookie. It supports both legacy SSR `data-slot="usage-item"` blocks and current `rollingUsage` / `weeklyUsage` / `monthlyUsage` → `$R[n]` serialized objects, reading their `usagePercent` and `resetInSec`. When both formats are present, the live serialized value wins to avoid a stale monthly-100% DOM shell. The result is cached and served through the same-origin JSON endpoints `/api/ocgo-usage` (+ `/api/ocgo-usage/refresh`, `/api/ocgo-usage/config`).
-- **Browser half** (`src/client/`) — registers the chip on the `conversation.composer.dock` slot, polls the host endpoint every 10s, and renders the three windows color-coded by severity. It is visible when the live provider in `session.models` contains `opencode` (case-insensitive); the chip position is pinned to the input card frame-by-frame by the rAF follower in `src/client/OcgoDockEntry.tsx`.
+- **Browser half** (`src/client/`) — registers the chip on the `conversation.composer.dock` slot, polls the host endpoint every 10s, and renders the three windows color-coded by severity. It is visible when the live provider in the `modelSelection` session projection contains `opencode` (case-insensitive); an unreadable provider keeps the chip visible instead of hiding it; the chip position is pinned to the input card frame-by-frame by the rAF follower in `src/client/OcgoDockEntry.tsx`.
 
 The browser never sees the cookie; fetching and parsing all happen host-side.
 
