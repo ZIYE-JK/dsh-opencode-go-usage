@@ -10,7 +10,7 @@ export type UsageStatus = 'ok' | 'rate-limited';
 export interface UsageWindow {
     /** Window identity. */
     readonly kind: UsageWindowKind;
-    /** 0–100 integer percent. */
+    /** Percent used, 0–100, up to one decimal (e.g. `10.5`). */
     readonly percent: number;
     /** Seconds until the window resets (coarse estimate from the SSR page). */
     readonly resetInSec: number;
