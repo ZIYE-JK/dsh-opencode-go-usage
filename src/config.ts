@@ -1,17 +1,24 @@
 /**
  * Configuration loader for dsh-ocgo-usage
  *
- * Priority: env vars > config file ($DSH_HOME/ocgo-usage.json) > built-in defaults
+ * Credential resolution order for the OpenCode Go usage API:
+ *   1. env `OPENCODE_GO_API_KEY`
+ *   2. this plugin's config file (`$DSH_HOME/ocgo-usage.json` → `apiKey`)
+ *   3. the harness credential table (`$DSH_HOME/.credentials.yaml` → `refs`)
  *
- * The cookie is NEVER logged. If the config file is missing or unparseable,
- * we silently fall back to env vars + defaults — the browser readout shows a
- * clean `noconfig` error if neither source provides a usable value.
+ * Step 3 is what makes the plugin work with no configuration at all: DSH's own
+ * `opencode-go` model route already stores its key under that reference name.
  *
- * Env var names match the pi-ocgo-usage extension so one shell profile works
- * for both agents.
+ * A session cookie is also supported as a deprecated fallback (see api.ts);
+ * it expires and needs periodic refreshing, so the API key is preferred.
+ *
+ * Priority for the other fields: env vars > config file > built-in defaults.
+ *
+ * Secrets are NEVER logged. If neither source provides a usable value the
+ * browser readout shows a clean `noconfig` error.
  *
  * The browser config editor (`/api/ocgo-usage/config`) reads a MASKED view
- * (never the full cookie) and writes back through {@link writeConfigFile}.
+ * (never the full secret) and writes back through {@link writeConfigFile}.
  * @module dsh-ocgo-usage/config
  */
 
@@ -20,6 +27,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { MaskedConfigView, MaskedSecret, OcgoConfig } from './types.ts'
 
+export const ENV_API_KEY = 'OPENCODE_GO_API_KEY'
 export const ENV_COOKIE = 'OPENCODE_GO_COOKIE'
 export const ENV_WORKSPACE_ID = 'OPENCODE_GO_WORKSPACE_ID'
 export const ENV_BASE_URL = 'OPENCODE_GO_BASE_URL'
@@ -44,7 +52,13 @@ export function configFilePath(): string {
   return join(dshHome(), 'ocgo-usage.json')
 }
 
+/** Resolved location of the harness credential table. */
+export function credentialsFilePath(): string {
+  return join(dshHome(), '.credentials.yaml')
+}
+
 interface FileConfig {
+  apiKey?: unknown
   cookie?: unknown
   workspaceID?: unknown
   baseUrl?: unknown
@@ -58,6 +72,15 @@ interface FileConfig {
  */
 export function loadConfig(): OcgoConfig {
   const fileConfig = readFileConfig()
+
+  // API key: env > plugin config file > harness credential table. Users may
+  // paste either the bare key or a full `Authorization: Bearer <key>` value.
+  const apiKey = normalizeApiKey(
+    pickString(
+      process.env[ENV_API_KEY],
+      asString(fileConfig?.apiKey) ?? readCredentialsRef(ENV_API_KEY),
+    ),
+  )
 
   // Cookie: prefer env, fall back to file; normalize so users can paste
   // either the full header or just the auth value.
@@ -84,7 +107,52 @@ export function loadConfig(): OcgoConfig {
     pickNumber(process.env[ENV_TIMEOUT_MS], asNumber(fileConfig?.timeoutMs), DEFAULT_TIMEOUT_MS),
   )
 
-  return { cookie, workspaceID, baseUrl, cacheTTL, timeoutMs }
+  return { apiKey, cookie, workspaceID, baseUrl, cacheTTL, timeoutMs }
+}
+
+/**
+ * Read one reference out of the harness credential table
+ * (`$DSH_HOME/.credentials.yaml` → `refs:`). Returns undefined when the file,
+ * the block, or the reference is absent — never throws.
+ */
+export function readCredentialsRef(ref: string): string | undefined {
+  const text = readFileSafe(credentialsFilePath())
+  if (text === undefined) return undefined
+  const block = extractRefsBlock(text)
+  if (block === undefined) return undefined
+  const escaped = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const value = block.match(new RegExp(`^\\s*${escaped}\\s*:\\s*(.+)$`, 'm'))?.[1]
+  if (value === undefined) return undefined
+  // Strip an inline comment, then surrounding quotes.
+  const bare = value.replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').trim()
+  return bare.length > 0 ? bare : undefined
+}
+
+/** The indented body of the top-level `refs:` mapping, when present. */
+function extractRefsBlock(text: string): string | undefined {
+  const lines = text.split(/\r?\n/)
+  const out: string[] = []
+  let inside = false
+  for (const line of lines) {
+    if (!inside) {
+      if (/^refs\s*:/.test(line)) inside = true
+      continue
+    }
+    // A non-indented line ends the block (the next top-level key).
+    if (/^\S/.test(line)) break
+    out.push(line)
+  }
+  return out.length > 0 ? out.join('\n') : undefined
+}
+
+/** Read a file as UTF-8, or undefined when it is missing or unreadable. */
+function readFileSafe(path: string): string | undefined {
+  if (!existsSync(path)) return undefined
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return undefined
+  }
 }
 
 /** Mask the last 4 characters of a secret for the browser (full value when ≤ 4 chars). */
@@ -93,22 +161,25 @@ export function maskSecret(value: string | undefined): MaskedSecret {
   return { set: true, tail: value.length <= 4 ? value : value.slice(-4) }
 }
 
-/** The browser-facing masked config view (never reveals the full cookie). */
+/** The browser-facing masked config view (never reveals a full secret). */
 export function maskedConfigView(): MaskedConfigView {
   const cfg = loadConfig()
   return {
     workspaceID: maskSecret(cfg.workspaceID),
+    apiKey: maskSecret(cfg.apiKey),
     cookie: maskSecret(cfg.cookie),
   }
 }
 
 /**
- * Write cookie / workspaceID into the config file (preserving any other
- * fields), chmod 600, and return the updated masked view. Values are
- * normalized like env input (cookie gets `auth=` prefixed when pasted bare).
- * Empty/absent fields are left untouched; pass `null` to clear a field.
+ * Write apiKey / cookie / workspaceID into the plugin config file (preserving
+ * any other fields), chmod 600, and return the updated masked view. Values are
+ * normalized like env input (a bare key gets no prefix; a cookie gets `auth=`
+ * prefixed when pasted bare). Empty/absent fields are left untouched; pass
+ * `null` to clear a field.
  */
 export function writeConfigFile(partial: {
+  apiKey?: string | null
   cookie?: string | null
   workspaceID?: string | null
 }): MaskedConfigView {
@@ -118,6 +189,11 @@ export function writeConfigFile(partial: {
     const v = typeof partial.workspaceID === 'string' ? partial.workspaceID.trim() : ''
     if (v.length > 0) next.workspaceID = v
     else delete next.workspaceID
+  }
+  if (partial.apiKey !== undefined) {
+    const v = typeof partial.apiKey === 'string' ? normalizeApiKey(partial.apiKey) : undefined
+    if (v !== undefined && v.length > 0) next.apiKey = v
+    else delete next.apiKey
   }
   if (partial.cookie !== undefined) {
     const v = typeof partial.cookie === 'string' ? normalizeCookie(partial.cookie) : undefined
@@ -134,15 +210,16 @@ export function writeConfigFile(partial: {
   }
   return {
     workspaceID: maskSecret(typeof next.workspaceID === 'string' ? next.workspaceID : undefined),
+    apiKey: maskSecret(typeof next.apiKey === 'string' ? next.apiKey : undefined),
     cookie: maskSecret(typeof next.cookie === 'string' ? next.cookie : undefined),
   }
 }
 
 function readFileConfig(): FileConfig | null {
   const path = configFilePath()
-  if (!existsSync(path)) return null
+  const raw = readFileSafe(path)
+  if (raw === undefined) return null
   try {
-    const raw = readFileSync(path, 'utf8')
     const parsed = JSON.parse(raw) as unknown
     if (parsed && typeof parsed === 'object') {
       return parsed as FileConfig
@@ -159,6 +236,23 @@ function pickString(envVal: string | undefined, fileVal: string | undefined): st
   if (envVal && envVal.length > 0) return envVal
   if (fileVal && fileVal.length > 0) return fileVal
   return undefined
+}
+
+/**
+ * Normalize a user-provided service-account API key.
+ *
+ * Accepts either the bare key (`oc_sk_...` / `sk-...`) or a pasted
+ * `Authorization` header value (`Bearer …`), and strips surrounding
+ * whitespace/quotes so a copy from the console always lands in a usable form.
+ */
+export function normalizeApiKey(input: string | undefined): string | undefined {
+  if (!input) return undefined
+  let v = input.trim().replace(/\s+/g, '')
+  if (!v) return undefined
+  if (/^Bearer:/i.test(v)) v = v.slice('Bearer:'.length)
+  else if (/^Bearer/i.test(v)) v = v.slice('Bearer'.length)
+  v = v.replace(/^["']|["']$/g, '').trim()
+  return v.length > 0 ? v : undefined
 }
 
 /**

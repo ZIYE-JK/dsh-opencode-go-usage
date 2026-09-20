@@ -80,10 +80,18 @@ function getRoute(path: string, run: () => Promise<OcgoUsageView>): WebRoute {
 function makeConfigRoutes(service: OcgoUsageService): WebRoute[] {
   const read = (): unknown => maskedConfigView()
   const write = async (req: IncomingMessage): Promise<unknown> => {
-    const body = (await readJsonBody(req)) as { cookie?: unknown; workspaceID?: unknown }
+    const body = (await readJsonBody(req)) as {
+      apiKey?: unknown
+      cookie?: unknown
+      workspaceID?: unknown
+    }
     // Distinguish "field absent" (keep current) from "field null/empty"
     // (clear it): only keys PRESENT in the body are touched.
-    const partial: { cookie?: string | null; workspaceID?: string | null } = {}
+    const partial: { apiKey?: string | null; cookie?: string | null; workspaceID?: string | null } =
+      {}
+    if ('apiKey' in body) {
+      partial.apiKey = typeof body.apiKey === 'string' ? body.apiKey : null
+    }
     if ('cookie' in body) {
       partial.cookie = typeof body.cookie === 'string' ? body.cookie : null
     }
