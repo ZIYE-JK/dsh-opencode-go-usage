@@ -12,7 +12,7 @@ export interface UsageWindow {
     readonly kind: UsageWindowKind;
     /** Percent used, 0–100, up to one decimal (e.g. `10.5`). */
     readonly percent: number;
-    /** Seconds until the window resets (coarse estimate from the SSR page). */
+    /** Seconds until the window resets (absolute instant from the API). */
     readonly resetInSec: number;
     /** `rate-limited` when the window is exhausted. */
     readonly status: UsageStatus;
@@ -28,9 +28,14 @@ export interface NormalizedUsage {
 }
 /** Fully resolved plugin configuration (env + config file + defaults). */
 export interface OcgoConfig {
+    /**
+     * Service-account API key (`oc_sk_...`). Preferred credential: it is sent as
+     * `Authorization: Bearer` and does not expire with the browser session.
+     */
+    readonly apiKey?: string;
     /** Full `Cookie:` header value (e.g. `auth=Fe26.2*...; oc_locale=zh`). */
     readonly cookie?: string;
-    /** OpenCode workspace id (e.g. `wrk_01...`). */
+    /** OpenCode workspace id (e.g. `wrk_01...`), also sent as `x-org-id`. */
     readonly workspaceID?: string;
     /** API base URL. */
     readonly baseUrl: string;
@@ -50,7 +55,7 @@ export interface OcgoUsageView {
     readonly monthly?: UsageWindowView;
     /** Machine-readable error code, present only on failure. */
     readonly error?: string;
-    /** Human-readable failure detail (never contains the cookie). */
+    /** Human-readable failure detail (never contains the cookie or API key). */
     readonly message?: string;
 }
 /** One masked secret field for the browser config editor (never the full value). */
@@ -63,6 +68,7 @@ export interface MaskedSecret {
 /** The browser-facing config view: which fields are set, masked. */
 export interface MaskedConfigView {
     readonly workspaceID: MaskedSecret;
+    readonly apiKey: MaskedSecret;
     readonly cookie: MaskedSecret;
 }
 //# sourceMappingURL=types.d.ts.map

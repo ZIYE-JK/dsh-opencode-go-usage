@@ -30,20 +30,23 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 
 ## 特性
 
-- **三个窗口** —— 5h 滚动 / 每周 / 每月 的百分比（**保留 1 位小数**，与官网一致）+ 重置倒计时
+- **三个窗口** —— 5h 滚动 / 每周 / 每月 的百分比 + 重置倒计时，直接取自 OpenCode 官方用量接口，与官网显示的数字一致
 - **颜色阈值** —— 正常 → 黄色警告（≥80%）→ 红色错误（≥90% 或已限流）
 - **每日剩余** —— 按月窗口折算的 `⏳ x.x%/天`，告诉你接下来每天平均还能用多少（<3%/天 红色、<5%/天 黄色）
 - **数据新鲜度** —— `upd HH:MM` 显示最近一次成功抓取时间
 - **轻量轮询** —— 每 10s 轮询（切回标签页立即刷新）；host 端 300s 缓存（TTL 可配）+ 60s 失败冷却，不会频繁打扰 opencode.ai
 - **Provider 感知** —— 仅当会话当前模型的 provider 名称包含 `opencode`（不区分大小写）时显示；每次轮询读取实时模型选择（`modelSelection` 会话投影，毫秒级、不联网），因此 `opencode-go`、`opencode-zen-go` 及未来 OpenCode 路由均会自动显示，切到不含 `opencode` 的 provider 后一个轮询周期内自动隐藏；provider 读不到时（会话尚未绑定、上游 API 变动）保持显示，不再静默隐藏
-- **浮动 chip** —— chip 逐帧跟随输入框卡片（rAF），调整侧边栏宽度或滚动页面时始终与卡片保持固定像素偏移；可按住拖拽微调位置、点锁形按钮固定（位置与锁定状态持久化在 localStorage）
+- **浮动 chip** —— chip 逐帧跟随输入框卡片（rAF）。位置以**锚点**记录：水平方向是「chip 左边 − 卡片左边」，垂直方向是「卡片顶边 − chip 底边」的间距。存间距而不是像素纵坐标，意味着 chip 自身变高变矮（切竖排、出现 `⏳` 行、进入错误态）或组件重新挂载后，落点都保持一致，不会再飘走；可按住拖拽微调、点锁形按钮固定（锚点与锁定状态持久化在 localStorage）
 - **横/竖排切换** —— chip 上的图标按钮在「一行横排」与「竖排卡片」之间切换：竖排为 `⚡ Go: upd HH:MM` + 三个窗口各一行 + `⏳` 单独一行，操作图标移到末行右侧；竖排保持底边不动、向上生长，不会盖住输入框；选择持久化于 localStorage（`dsh.ocgoChip.layout`）
 - **点击展开** —— 详情面板显示每个窗口的重置倒计时，左下角 `set` 可配置凭据，右侧 `refresh upd HH:MM` 手动刷新
-- **内置凭据编辑器** —— 无需碰终端：`set` 面板直接修改 workspace id 与 cookie（输入框以 `••••` + 末尾 4 位显示，点击外部 / Esc / 保存确认写入）
-- **优雅降级** —— 配置缺失显示 `<err:noconfig>`，HTTP 失败显示 `<err:httpXXX>`；出错时点击 chip 直接进入 set 面板
-- **Cookie 只在 host 侧** —— 浏览器只访问同源 `/api/ocgo-usage` JSON 端点，cookie 永不进入页面
+- **内置凭据编辑器** —— 无需碰终端：`set` 面板直接修改服务账号 API Key、workspace id 与 cookie（输入框以 `••••` + 末尾 4 位显示，点击外部 / Esc / 保存确认写入）
+- **零配置即可用** —— 若你的 DSH 已经配好 `opencode-go` provider（密钥在 `$DSH_HOME/.credentials.yaml` 的 `OPENCODE_GO_API_KEY`），插件会**自动复用同一把密钥**，不需要填写任何东西
+- **优雅降级** —— 配置缺失显示 `<err:noconfig>`，认证失败显示 `<err:unauthorized>`，HTTP 失败显示 `<err:httpXXX>`；出错时点击 chip 直接进入 set 面板
+- **凭据只在 host 侧** —— 浏览器只访问同源 `/api/ocgo-usage` JSON 端点，API Key 与 cookie 永不进入页面
 
-> **⚠️ 需要 OpenCode Go 会话 cookie。** 该 cookie 是完整用户会话（不是 API key），可访问你 OpenCode 账户的全部内容。请像对待密码一样对待它——见 [配置](#配置)。
+> **✅ 推荐使用 OpenCode 服务账号 API Key。** 它在 OpenCode 控制台单独创建、可随时单独吊销，不随浏览器登录状态过期，且插件只把它用于读取用量。
+
+> **⚠️ 旧版的会话 Cookie 仍兼容，但已不推荐。** `auth` cookie 是**完整的用户会话**（不是 API key），可访问你 OpenCode 账户的全部内容；且它失效时会静默导致取数失败。请优先用 API Key —— 见 [配置](#配置)。
 
 ## 与上游的差异
 
@@ -51,11 +54,12 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 
 | 定制点 | 说明 |
 |---|---|
+| 取数改用官方接口 | 从「抓取 `/workspace/<wrk>/go` 页面并解析 DOM」改为调用官方用量接口 `GET /zen/go/v1/usage`（`Authorization: Bearer`），拿到结构化的 `{usage:{rolling,weekly,monthly}}`，不再依赖页面结构 |
+| 服务账号 API Key 取代 Cookie | 默认凭据从会话 cookie 换成服务账号 API Key：只读、可单独吊销、不随浏览器登录过期；cookie 保留为回退路径（走 `/console/api/go/status` + `x-org-id`） |
+| 零配置凭据发现 | 未显式配置时自动读取 `$DSH_HOME/.credentials.yaml` 中 `refs` 段的 `OPENCODE_GO_API_KEY`，即 DSH `opencode-go` provider 正在用的那把密钥 |
 | chip 窗口标签图标化 | `5h / wk / mo` 文本标签改为 `🕔 / 7️⃣ / 🈷️` 图标（详情面板仍为完整文字） |
-| chip 跟随输入框卡片 | 逐帧 rAF 钉在卡片上（`position: fixed` 坐标 = 卡片位置 + 用户偏移），拖拽移动、锁形按钮固定；偏移持久化于 `dsh.ocgoChip.offset`（旧 `dsh.ocgoChip.pos` 一次性迁移） |
+| chip 跟随输入框卡片 | 逐帧 rAF 钉在卡片上，位置以「水平偏移 + 底边间距」锚点记录（`dsh.ocgoChip.anchor`），chip 高度变化或组件重挂载后落点不变；拖拽移动、锁形按钮固定 |
 | 每日剩余指标 | 按月窗口折算 `⏳ x.x%/天`，按 <3%/<5% 阈值变色（新增 `segOk` 样式） |
-| 百分比精度 | 保留 1 位小数（上游 `Math.floor` 取整丢精度）：`usagePercent` 的小数被完整保留，旧 `data-slot` 文本里的 `10.5%` 也能解析，与 OpenCode 官网显示的百分比一致 |
-| 当前 OpenCode 页面解析 | 兼容 `rollingUsage` / `weeklyUsage` / `monthlyUsage` 指向的 `$R[n]` 序列化对象，从 `usagePercent` 与 `resetInSec` 读取实时值；与旧 `data-slot` DOM 同时存在时，实时序列化值优先，避免旧壳层错误显示月度 100% |
 | OpenCode provider 通配 | 只要当前 provider 名称包含 `opencode`（不区分大小写）就展示 chip，支持 `opencode-zen-go` 及未来 OpenCode 路由 |
 | 横/竖排切换 | chip 新增布局切换按钮：横排（默认，一行）或竖排卡片（`⚡ Go: upd HH:MM` + 三个窗口各一行 + `⏳` 一行，操作图标在末行右侧）；竖排按高度差补偿，保持底边不动向上生长；选择持久化于 `dsh.ocgoChip.layout` |
 | 运行时依赖修复 | `@deepseek-ai/cordis` 移入 `dependencies`（link 安装时 npm 不自动装 peer 依赖导致启动失败的问题） |
@@ -73,7 +77,7 @@ OpenCode Go: 🕔 0% (2h 39m) · 7️⃣ 31% (2d 15h) · 🈷️ 62% (15d 18h) �
 ### 从 GitHub 安装（推荐）
 
 ```sh
-dsh plugin --profile web add github:ZIYE-JK/dsh-ocgo-usage
+dsh plugin --profile web add github:ZIYE-JK/dsh-opencode-go-usage
 ```
 
 因为 `lib/` 已提交到仓库，pnpm 直接安装构建好的包，不会要求构建脚本授权。
@@ -81,15 +85,15 @@ dsh plugin --profile web add github:ZIYE-JK/dsh-ocgo-usage
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.3.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.3.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.2.0.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.2.0.tgz
 ```
 
 ### 本地开发安装
 
 ```sh
-git clone https://github.com/ZIYE-JK/dsh-ocgo-usage.git
-cd dsh-ocgo-usage
+git clone https://github.com/ZIYE-JK/dsh-opencode-go-usage.git
+cd dsh-opencode-go-usage
 pnpm install
 pnpm run build
 dsh plugin --profile web add link:$(pwd)
@@ -105,17 +109,27 @@ dsh --profile web --dump-config   # 应显示 "# == dsh-ocgo-usage" 层
 
 ## 配置
 
-### 方式一：界面内 set 面板（最简单）
+### 方式零：什么都不配（推荐先试这个）
 
-点击 chip 展开详情 → 左下角 `set` → 输入 workspace id 与 cookie（已设置的值以 `••••` + 末尾 4 位显示，聚焦即可输入新值）→ 点击外部 / Esc / 保存按钮确认，立即生效。
+如果你的 DSH 已经配置了 `opencode-go` provider，密钥就存放于 `$DSH_HOME/.credentials.yaml` 的 `refs.OPENCODE_GO_API_KEY`。插件会**自动读取并复用**这把密钥，装完重启即可直接出数。
+
+### 方式一：界面内 set 面板
+
+点击 chip 展开详情 → 左下角 `set` → 填写服务账号 API Key（也可填 workspace id；旧 cookie 方式仍可在此录入）（已设置的值以 `••••` + 末尾 4 位显示，聚焦即可输入新值）→ 点击外部 / Esc / 保存按钮确认，立即生效。
 
 ![Set editor](assets/set-cookie-wid.png)
 
-### 方式二：环境变量（与 pi-ocgo-usage 同名）
+### 方式二：环境变量
+
+```sh
+export OPENCODE_GO_API_KEY="oc_sk_..."      # 推荐：服务账号 API Key
+export OPENCODE_GO_WORKSPACE_ID="wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"   # 可选
+```
+
+旧方式（不推荐，仅作回退）：
 
 ```sh
 export OPENCODE_GO_COOKIE="auth=Fe26.2*...; oc_locale=zh"
-export OPENCODE_GO_WORKSPACE_ID="wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
 ```
 
 ### 方式三：配置文件
@@ -124,7 +138,7 @@ export OPENCODE_GO_WORKSPACE_ID="wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
 
 ```jsonc
 {
-  "cookie": "auth=Fe26.2*...; oc_locale=zh",
+  "apiKey": "oc_sk_...",
   "workspaceID": "wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
 }
 ```
@@ -133,13 +147,13 @@ export OPENCODE_GO_WORKSPACE_ID="wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
 chmod 600 ~/.dsh/ocgo-usage.json
 ```
 
-优先级：环境变量 > 配置文件 > 内置默认。
+优先级：环境变量 > 配置文件 > `$DSH_HOME/.credentials.yaml` > 内置默认。
 
 ### 可选覆盖项
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `OPENCODE_GO_BASE_URL` | `https://opencode.ai` | API 基础地址 |
+| `OPENCODE_GO_BASE_URL` | `https://opencode.ai` | API 基础地址（用量端点为 `<baseUrl>/zen/go/v1/usage`） |
 | `OPENCODE_GO_CACHE_TTL` | `300` | host 缓存秒数，范围 60–3600 |
 | `OPENCODE_GO_TIMEOUT_MS` | `10000` | HTTP 超时 |
 
@@ -151,7 +165,9 @@ chmod 600 ~/.dsh/ocgo-usage.json
     enabled: false    # 总开关，默认 true
 ```
 
-> **Cookie 过期：** `auth` cookie 签发后有效期 1 年。过期（或被吊销）后页面 302 跳转到登录页，chip 显示 `<err:http302>` 而非过期数字。重新登录 opencode.ai 后，通过 set 面板更新 cookie 即可。
+> **凭据失效时：** 若 API Key 被吊销或写错，chip 显示 `<err:unauthorized>`；若用旧 cookie 且会话已过期，同样会报认证失败。点 chip 进入 set 面板换上新值即可。
+>
+> 历史提示：0.1.x 抓取的页面 `/workspace/<wrk>/go` 已被 opencode.ai 下线，现在会 302 跳转到控制台登录页，这正是旧版本 chip 显示 `error 302` 的原因；0.2.0 起改用官方接口后不再受影响。
 
 ## 使用
 
@@ -161,15 +177,26 @@ chmod 600 ~/.dsh/ocgo-usage.json
 
 ## 工作原理
 
-- **Host 半**（`src/index.ts`、`src/service.ts`、`src/api.ts`、`src/routes.ts`）—— 携带 cookie 抓取 `GET /workspace/<wrk>/go`；兼容旧 SSR `data-slot="usage-item"` 块，也兼容当前 `rollingUsage` / `weeklyUsage` / `monthlyUsage` → `$R[n]` 的序列化对象，读取其中的 `usagePercent` 与 `resetInSec`。两种格式同时存在时优先采用实时序列化值，避免旧 DOM 壳层误报月度 100%。结果缓存后通过同源 JSON 端点 `/api/ocgo-usage`（+ `/api/ocgo-usage/refresh`、`/api/ocgo-usage/config`）提供数据。
-- **浏览器半**（`src/client/`）—— 向 `conversation.composer.dock` slot 注册 chip，每 10s 轮询 host 端点，按严重级别着色渲染三个窗口；当 `modelSelection` 会话投影中的实时 provider 名称包含 `opencode`（不区分大小写）时显示（读不到 provider 时保持显示，不静默隐藏）；chip 位置由 `src/client/OcgoDockEntry.tsx` 中的 rAF 跟随逻辑逐帧钉在输入框卡片上；chip 支持横排/竖排两种布局（持久化于 `dsh.ocgoChip.layout`），竖排为 5 行卡片、操作图标位于末行右侧。
+- **Host 半**（`src/index.ts`、`src/service.ts`、`src/api.ts`、`src/routes.ts`）—— 优先用**官方用量接口**取数：
 
-浏览器永远看不到 cookie；抓取与解析全部在 host 侧完成。
+  ```
+  GET {baseUrl}/zen/go/v1/usage
+  Authorization: Bearer <OPENCODE_GO_API_KEY>
+  User-Agent: dsh-ocgo-usage (...)
+  ```
+
+  响应为 `{"usage":{"rolling":{"status","percent","resetsAt"}, "weekly":{...}, "monthly":{...}}}`：`percent` 是**已用**比例（0–100），`resetsAt` 是 ISO 时间戳，host 侧换算成重置倒计时。注意必须显式设置 `User-Agent`，否则 Cloudflare 会以 `Error 1010` 直接 403。
+
+  未配置 API Key 时回退到旧路径：带 cookie 请求 `/console/api/go/status`（并附加 `x-org-id`），把微美分字符串额度换算成百分比。结果缓存后通过同源 JSON 端点 `/api/ocgo-usage`（+ `/api/ocgo-usage/refresh`、`/api/ocgo-usage/config`）提供数据。
+- **浏览器半**（`src/client/`）—— 向 `conversation.composer.dock` slot 注册 chip，每 10s 轮询 host 端点，按严重级别着色渲染三个窗口；当 `modelSelection` 会话投影中的实时 provider 名称包含 `opencode`（不区分大小写）时显示（读不到 provider 时保持显示，不静默隐藏）；chip 位置由 `src/client/OcgoDockEntry.tsx` 中的 rAF 跟随逻辑逐帧钉在输入框卡片上（锚点模型）；chip 支持横排/竖排两种布局（持久化于 `dsh.ocgoChip.layout`），竖排为 5 行卡片、操作图标位于末行右侧。
+
+浏览器永远看不到 API Key 与 cookie；取数与解析全部在 host 侧完成。
 
 ## 安全
 
-- `auth` cookie 是**完整的 OpenCode 用户会话**。任何人拿到它都能访问你账户内的所有 workspace、订阅与账单信息。
-- 插件**绝不**记录 cookie、不把它放进错误信息、不发送给浏览器。
+- 插件只需要**读取用量**。推荐使用 OpenCode **服务账号 API Key**（控制台可单独创建与吊销，不随浏览器会话过期）。
+- 旧版 `auth` cookie 是**完整的 OpenCode 用户会话**。任何人拿到它都能访问你账户内的所有 workspace、订阅与账单信息 —— 因此仅在不得已时使用，并优先迁移到 API Key。
+- 插件**绝不**记录 API Key 与 cookie、不把它们放进错误信息、不发送给浏览器。
 - 配置编辑器只把新值写入 `$DSH_HOME/ocgo-usage.json`（chmod 600），浏览器始终只看到 `••••` + 末尾 4 位的掩码视图。
 
 ## 开发
@@ -178,12 +205,22 @@ chmod 600 ~/.dsh/ocgo-usage.json
 pnpm install
 pnpm run build     # tsc -b && tsdown → lib/
 pnpm run typecheck # tsc -b --pretty false
-pnpm test          # vitest run（解析器 / 配置 / 服务）
+pnpm test          # vitest run（官方接口解析 / 控制台解析 / 配置与凭据发现 / 取数路由 / 缓存服务）
 ```
 
 > **改 client 端后无需重启 dsh web：** host 实时从磁盘读取 `/plugins/dsh-ocgo-usage/client.js`，改完刷新浏览器页面即可；改 host 端（`src/index.ts` 等）则需重启。
 
 构建配置（`shared/tsdown.client.ts`）改编自 [dsh-balance-meter](https://github.com/Ghost011118/dsh-balance-meter)（BSD-3-Clause），后者是官方 DSH `packages/client/tsdown.client.ts` 的副本——它产出 web shell 模块表所需的 `window.__ModuleLoader__.load({id, factory})` 闭包工厂产物。
+
+## 更新日志
+
+### 0.2.0
+
+- **改用官方 Go 用量接口** `GET /zen/go/v1/usage`（`Authorization: Bearer`）。0.1.x 抓取的 `/workspace/<wrk>/go` 页面已被 opencode.ai 下线并 302 跳转到登录页，这是旧的 `error 302` 根因。
+- **服务账号 API Key 取代会话 Cookie** 作为默认凭据；cookie 保留为回退路径（`/console/api/go/status` + `x-org-id`）。
+- **零配置凭据发现**：自动复用 `$DSH_HOME/.credentials.yaml` 中的 `OPENCODE_GO_API_KEY`。
+- **chip 定位改为锚点模型**（`dsh.ocgoChip.anchor`）：重挂载、切会话、切布局后不再飘走。旧的 `dsh.ocgoChip.offset` 会自动迁移。
+- 新增/重写单元测试，覆盖两个端点的解析、错误分层、凭据优先级与取数路由（共 70 个用例）。
 
 ## 致谢
 

@@ -1,20 +1,28 @@
 /**
  * Configuration loader for dsh-ocgo-usage
  *
- * Priority: env vars > config file ($DSH_HOME/ocgo-usage.json) > built-in defaults
+ * Credential resolution order for the OpenCode Go usage API:
+ *   1. env `OPENCODE_GO_API_KEY`
+ *   2. this plugin's config file (`$DSH_HOME/ocgo-usage.json` → `apiKey`)
+ *   3. the harness credential table (`$DSH_HOME/.credentials.yaml` → `refs`)
  *
- * The cookie is NEVER logged. If the config file is missing or unparseable,
- * we silently fall back to env vars + defaults — the browser readout shows a
- * clean `noconfig` error if neither source provides a usable value.
+ * Step 3 is what makes the plugin work with no configuration at all: DSH's own
+ * `opencode-go` model route already stores its key under that reference name.
  *
- * Env var names match the pi-ocgo-usage extension so one shell profile works
- * for both agents.
+ * A session cookie is also supported as a deprecated fallback (see api.ts);
+ * it expires and needs periodic refreshing, so the API key is preferred.
+ *
+ * Priority for the other fields: env vars > config file > built-in defaults.
+ *
+ * Secrets are NEVER logged. If neither source provides a usable value the
+ * browser readout shows a clean `noconfig` error.
  *
  * The browser config editor (`/api/ocgo-usage/config`) reads a MASKED view
- * (never the full cookie) and writes back through {@link writeConfigFile}.
+ * (never the full secret) and writes back through {@link writeConfigFile}.
  * @module dsh-ocgo-usage/config
  */
 import type { MaskedConfigView, MaskedSecret, OcgoConfig } from './types.ts';
+export declare const ENV_API_KEY = "OPENCODE_GO_API_KEY";
 export declare const ENV_COOKIE = "OPENCODE_GO_COOKIE";
 export declare const ENV_WORKSPACE_ID = "OPENCODE_GO_WORKSPACE_ID";
 export declare const ENV_BASE_URL = "OPENCODE_GO_BASE_URL";
@@ -29,25 +37,43 @@ export declare const MAX_CACHE_TTL = 3600;
 export declare function dshHome(): string;
 /** Resolved location of the plugin config file. */
 export declare function configFilePath(): string;
+/** Resolved location of the harness credential table. */
+export declare function credentialsFilePath(): string;
 /**
  * Load and merge config from file + env vars.
  * Returns a fully resolved OcgoConfig; never throws.
  */
 export declare function loadConfig(): OcgoConfig;
+/**
+ * Read one reference out of the harness credential table
+ * (`$DSH_HOME/.credentials.yaml` → `refs:`). Returns undefined when the file,
+ * the block, or the reference is absent — never throws.
+ */
+export declare function readCredentialsRef(ref: string): string | undefined;
 /** Mask the last 4 characters of a secret for the browser (full value when ≤ 4 chars). */
 export declare function maskSecret(value: string | undefined): MaskedSecret;
-/** The browser-facing masked config view (never reveals the full cookie). */
+/** The browser-facing masked config view (never reveals a full secret). */
 export declare function maskedConfigView(): MaskedConfigView;
 /**
- * Write cookie / workspaceID into the config file (preserving any other
- * fields), chmod 600, and return the updated masked view. Values are
- * normalized like env input (cookie gets `auth=` prefixed when pasted bare).
- * Empty/absent fields are left untouched; pass `null` to clear a field.
+ * Write apiKey / cookie / workspaceID into the plugin config file (preserving
+ * any other fields), chmod 600, and return the updated masked view. Values are
+ * normalized like env input (a bare key gets no prefix; a cookie gets `auth=`
+ * prefixed when pasted bare). Empty/absent fields are left untouched; pass
+ * `null` to clear a field.
  */
 export declare function writeConfigFile(partial: {
+    apiKey?: string | null;
     cookie?: string | null;
     workspaceID?: string | null;
 }): MaskedConfigView;
+/**
+ * Normalize a user-provided service-account API key.
+ *
+ * Accepts either the bare key (`oc_sk_...` / `sk-...`) or a pasted
+ * `Authorization` header value (`Bearer …`), and strips surrounding
+ * whitespace/quotes so a copy from the console always lands in a usable form.
+ */
+export declare function normalizeApiKey(input: string | undefined): string | undefined;
 /**
  * Normalize a user-provided cookie string into a valid `Cookie:` header value.
  *
