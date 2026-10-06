@@ -14,6 +14,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import { isOpenCodeGo } from '../provider.ts'
 import type { MaskedConfigView, OcgoUsageView, UsageWindow, UsageWindowKind } from '../types.ts'
 import { NS, type OcgoKey } from './locales.ts'
+import { findCard } from './composerCard.ts'
 import css from './ocgo.module.css'
 
 /** Poll interval for the host snapshot and the live model provider. */
@@ -21,22 +22,6 @@ const POLL_MS = 10_000
 
 /** The masked-prefix shown before the last-4 tail of a secret. */
 const MASK = '••••'
-
-/** Locate the composer input card element: first descendant of the nearest
- * column root whose layout signature matches the card (position:relative +
- * 22px radius + capped max-width). Returns null when absent so callers can
- * degrade gracefully. */
-function findCard(wrap: HTMLElement): HTMLElement | null {
-  let el = wrap.parentElement
-  for (let i = 0; el !== null && el !== document.body && i < 6; i++) {
-    for (const child of Array.from(el.children) as HTMLElement[]) {
-      const cs = window.getComputedStyle(child)
-      if (cs.position === 'relative' && cs.borderRadius === '22px' && cs.maxWidth !== 'none') return child
-    }
-    el = el.parentElement
-  }
-  return null
-}
 
 /** Same-origin JSON fetch helper. */
 async function ocgoFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -198,6 +183,9 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       return next
     })
   }, [])
+  /** Live drag state; `baseLeft`/`baseTop` are the chip's viewport box at
+   * mousedown, so a drag is a pure pixel delta that stays correct even when
+   * the composer card cannot be identified. */
   const dragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, baseLeft: 0, baseTop: 0 })
   const posRef = useRef(pos)
   posRef.current = pos
@@ -447,10 +435,10 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
     loadConfig()
   }, [loadConfig])
 
-  /** Drag start: record the pointer origin and the chip's current top-left
-   * position relative to the card. The stored anchor is height-independent,
-   * but a drag is easiest to track in plain pixels. Locked chips are not
-   * draggable. */
+  /** Drag start: freeze the chip's current on-screen box, resolve the card it
+   * belongs to, and record the pointer origin. The box is captured in viewport
+   * pixels (not card-relative ones) so a drag keeps working even when the card
+   * cannot be identified. Locked chips are not draggable. */
   const onWrapMouseDown = (event: React.MouseEvent): void => {
     if (locked) return
     const wrap = wrapRef.current
@@ -461,14 +449,16 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       card = findCard(wrap)
       cardRef.current = card
     }
-    let baseLeft = 0
-    let baseTop = 0
-    if (card !== null) {
-      const wrapRect = wrap.getBoundingClientRect()
-      const cardRect = card.getBoundingClientRect()
-      baseLeft = Math.round(wrapRect.left - cardRect.left)
-      baseTop = Math.round(wrapRect.top - cardRect.top)
-    }
+    // Pin the chip exactly where it is drawn before the first move: an
+    // absolutely laid-out chip would otherwise read the drag's left/top against
+    // a different containing block and jump.
+    const wrapRect = wrap.getBoundingClientRect()
+    const baseLeft = Math.round(wrapRect.left)
+    const baseTop = Math.round(wrapRect.top)
+    wrap.style.position = 'fixed'
+    wrap.style.left = `${baseLeft}px`
+    wrap.style.top = `${baseTop}px`
+    wrap.style.bottom = 'auto'
     dragRef.current = {
       active: true,
       moved: false,
@@ -491,7 +481,9 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
   }
 
   /** Drag move/end listeners (window-scoped so the drag survives the pointer
-   * leaving the chip). Positions are written straight to the DOM. */
+   * leaving the chip). Positions are written straight to the DOM as viewport
+   * pixels; the drop position is re-expressed as the card-relative anchor the
+   * follower below re-applies. */
   useEffect(() => {
     const onMove = (event: MouseEvent): void => {
       const d = dragRef.current
@@ -499,27 +491,30 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       const dx = event.clientX - d.startX
       const dy = event.clientY - d.startY
       if (!d.moved && Math.abs(dx) + Math.abs(dy) > 3) d.moved = true
-      if (d.moved) {
-        const wrap = wrapRef.current
-        const card = cardRef.current
-        if (wrap !== null && card !== null) {
-          const cardRect = card.getBoundingClientRect()
-          wrap.style.left = `${Math.round(cardRect.left + d.baseLeft + dx)}px`
-          wrap.style.top = `${Math.round(cardRect.top + d.baseTop + dy)}px`
-        }
-        document.body.style.cursor = 'grabbing'
-      }
+      if (!d.moved) return
+      const wrap = wrapRef.current
+      if (wrap === null) return
+      wrap.style.left = `${Math.round(d.baseLeft + dx)}px`
+      wrap.style.top = `${Math.round(d.baseTop + dy)}px`
+      document.body.style.cursor = 'grabbing'
     }
     const onUp = (): void => {
       const d = dragRef.current
       if (!d.active) return
       d.active = false
       document.body.style.cursor = ''
-      if (d.moved) {
-        d.moved = false
-        const card = cardRef.current
-        if (card !== null && document.body.contains(card)) captureAnchor(card)
+      if (!d.moved) return
+      const card = cardRef.current
+      if (card !== null && document.body.contains(card)) {
+        // Drop the cached position first: the follower must re-read the anchor
+        // captured below instead of trusting its pre-drag value.
+        chipStyleRef.current = null
+        captureAnchor(card)
       }
+      // Keep `moved` set until the click that closes this gesture has been
+      // seen (the chip's onClick consumes it), then clear it so a later
+      // keyboard activation is not swallowed.
+      window.setTimeout(() => { d.moved = false }, 0)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
