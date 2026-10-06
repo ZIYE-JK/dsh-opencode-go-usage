@@ -85,8 +85,8 @@ Because `lib/` is committed to the repository, pnpm installs the built package d
 ### From tarball
 
 ```sh
-pnpm pack            # inside this repo → dsh-ocgo-usage-0.2.0.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.2.0.tgz
+pnpm pack            # inside this repo → dsh-ocgo-usage-0.2.1.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.2.1.tgz
 ```
 
 ### Local development install
@@ -213,6 +213,14 @@ pnpm test          # vitest run (Go API parser / console parser / config + crede
 The build config (`shared/tsdown.client.ts`) is adapted from [dsh-balance-meter](https://github.com/Ghost011118/dsh-balance-meter) (BSD-3-Clause), itself a copy of the official DSH `packages/client/tsdown.client.ts` — it produces the closure-factory artifacts that the web shell's module table (`window.__ModuleLoader__.load({id, factory})`) requires.
 
 ## Changelog
+
+### 0.2.1
+
+- **Fixed: the chip could not be dragged after unpinning.** DSH 0.2.x themes the composer card with `--dsw-radius-panel` (28px), so the hard-coded `border-radius: 22px` signature never matched again: `findCard` returned null, the drag handler wrote no position at all, and the chip stayed put whether or not it was pinned.
+- Added `src/client/composerCard.ts`: it prefers the `data-composer-card` marker DSH stamps on the card, falls back to a geometry signature whose radius is a lower bound (>= 16px) so a theme change cannot break it again, and never returns the branch that contains the chip.
+- The drag now moves in viewport pixels: the chip box is frozen on mousedown and moved by the pointer delta, so an unidentifiable card can no longer make it undraggable; the drop is still re-expressed as the card-relative anchor, so the chip keeps following the composer.
+- The `moved` flag now survives until the closing click has been consumed, so releasing a drag no longer toggles the detail panel.
+- Added 8 unit cases for the card locator and `test/client-loader-mock.cjs`, the offline client-bundle guardrail against a broken bundle taking down the GUI.
 
 ### 0.2.0
 

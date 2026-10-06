@@ -85,8 +85,8 @@ dsh plugin --profile web add github:ZIYE-JK/dsh-opencode-go-usage
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.2.0.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.2.0.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.2.1.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.2.1.tgz
 ```
 
 ### 本地开发安装
@@ -213,6 +213,14 @@ pnpm test          # vitest run（官方接口解析 / 控制台解析 / 配置�
 构建配置（`shared/tsdown.client.ts`）改编自 [dsh-balance-meter](https://github.com/Ghost011118/dsh-balance-meter)（BSD-3-Clause），后者是官方 DSH `packages/client/tsdown.client.ts` 的副本——它产出 web shell 模块表所需的 `window.__ModuleLoader__.load({id, factory})` 闭包工厂产物。
 
 ## 更新日志
+
+### 0.2.1
+
+- **修复：取消固定后芯片仍无法拖动。** DSH 0.2.x 用主题变量 `--dsw-radius-panel`（28px）设定输入框卡片圆角，旧的硬编码 `border-radius: 22px` 指纹从此永不命中：`findCard` 恒返回 null、拖拽回调一个像素都不写，于是无论是否固定都拖不动。
+- 新增 `src/client/composerCard.ts`：优先识别 DSH 官方标记 `[data-composer-card]`；回退到几何特征，并把圆角从等值判断改为下限判断（≥16px），主题变量再变也不会失效；同时排除"包含芯片自身的那一支"。
+- 拖拽改为视口像素增量：按下先冻结芯片当前盒模型，再按指针位移移动，卡片识别失败也不会再导致拖不动；松手时仍回写卡片相对锚点，保持跟随输入框。
+- 手势结束后保留 `moved` 标记到那次 click 被消费为止，修掉"拖完松手误触发展开/收起面板"。
+- 新增 8 条卡片定位单测；新增 `test/client-loader-mock.cjs` 离线加载护栏（客户端包出错拖垮 GUI 的防复发检查）。
 
 ### 0.2.0
 
